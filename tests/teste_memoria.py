@@ -1,204 +1,186 @@
+import pytest
+from memoria.ram import RAM
+from devices.vram import VRAM
+from memoria.bus import (
+    Bus,
+    RAM_INICIO,
+    RAM_FIM,
+    VRAM_INICIO,
+    VRAM_FIM,
+    RESERVADO_INICIO,
+    IO_INICIO,
+    IO_FIM,
+)
 
-from memoria.ram import RAM, VRAM
+
+@pytest.fixture
+def ram():
+    return RAM(1024)
 
 
-def testar_ram():
-    # Cria uma RAM com 1024 bytes para o teste
-    tamanho_teste = 1024
-    ram = RAM(tamanho_teste)
+@pytest.fixture
+def vram():
+    return VRAM(0x10000)
 
-    print("Iniciando testes de memória (RAM)...")
 
-    # 1. Teste de escrita e leitura de bytes individuais
-    ram.store_byte(0x00, 0x4F)  # 'O' em ASCII
-    ram.store_byte(0x01, 0x49)  # 'I' em ASCII
+@pytest.fixture
+def bus():
+    return Bus()
 
-    assert ram.load_byte(0x00) == 0x4F, "Erro no byte 0x00"
-    assert ram.load_byte(0x01) == 0x49, "Erro no byte 0x01"
 
-    print(" [OK] Teste de bytes individuais passou!")
+# ==================== TESTES DA RAM ====================
 
-    # 2. Teste de escrita e leitura de palavras de 32 bits
-    # Little-endian: byte menos significativo no menor endereco
-    endereco_palavra = 0x04
-    valor_original = 0x12345678
+def test_ram_byte(ram):
+    ram.store_byte(0x00, 0x4F)
+    ram.store_byte(0x01, 0x49)
+    assert ram.load_byte(0x00) == 0x4F
+    assert ram.load_byte(0x01) == 0x49
 
-    ram.store_word(endereco_palavra, valor_original)
 
-    # Verifica os bytes na memoria
-    assert ram.load_byte(endereco_palavra) == 0x78
-    assert ram.load_byte(endereco_palavra + 1) == 0x56
-    assert ram.load_byte(endereco_palavra + 2) == 0x34
-    assert ram.load_byte(endereco_palavra + 3) == 0x12
+def test_ram_word_little_endian(ram):
+    ram.store_word(0x04, 0x12345678)
+    assert ram.load_byte(0x04) == 0x78
+    assert ram.load_byte(0x05) == 0x56
+    assert ram.load_byte(0x06) == 0x34
+    assert ram.load_byte(0x07) == 0x12
+    assert ram.load_word(0x04) == 0x12345678
 
-    # Verifica leitura da palavra inteira
-    valor_lido = ram.load_word(endereco_palavra)
 
-    assert valor_lido == valor_original, (
-        f"Esperado {hex(valor_original)}, "
-        f"obtido {hex(valor_lido)}"
-    )
-
-    print(" [OK] Teste de palavras (load_word / store_word) passou!")
-
-    # 3. Teste de alinhamento
-    try:
-        ram.load_word(0x05)
-        assert False, "Deveria ter lançado erro de alinhamento!"
-    except ValueError as erro:
-        assert "alinhado" in str(erro).lower()
-
-    print(" [OK] Teste de alinhamento passou!")
-
-    # 4. Teste de endereco fora da RAM
-    try:
-        ram.load_byte(1024)
-        assert False, "Deveria ter lançado erro de endereço!"
-    except ValueError as erro:
-        assert "ram" in str(erro).lower()
-
-    print(" [OK] Teste de endereço fora da RAM passou!")
-
-    # 5. Teste de endereço negativo
-    try:
-        ram.load_byte(-1)
-        assert False, "Deveria ter lançado erro para endereço negativo!"
-    except ValueError:
-        pass
-
-    print(" [OK] Teste de endereço negativo passou!")
-
-    # 6. Teste de endereço que não é inteiro
-    try:
-        ram.load_byte("10")
-        assert False, "Deveria ter lançado TypeError!"
-    except TypeError:
-        pass
-
-    print(" [OK] Teste de tipo de endereço passou!")
-
-    # 7. Teste de word no limite da RAM
-    # 1020 é válido: acessa 1020, 1021, 1022 e 1023
+def test_ram_word_limite(ram):
     ram.store_word(1020, 0xAABBCCDD)
-
     assert ram.load_word(1020) == 0xAABBCCDD
 
-    print(" [OK] Teste de word no limite válido passou!")
 
-    # 8. Teste de word que ultrapassa a RAM
-    # 1024 está fora da RAM e não pode ser acessado
-    try:
+def test_ram_excecoes(ram):
+    with pytest.raises(ValueError, match="(?i)alinhado"):
+        ram.load_word(0x05)
+
+    with pytest.raises(ValueError, match="(?i)ram"):
+        ram.load_byte(1024)
+
+    with pytest.raises(ValueError):
+        ram.load_byte(-1)
+
+    with pytest.raises(TypeError):
+        ram.load_byte("10")
+
+    with pytest.raises(ValueError):
         ram.store_word(1024, 0x12345678)
-        assert False, "Deveria ter lançado erro de limite!"
-    except ValueError:
-        pass
 
-    # 1022 é alinhado? Não. O erro esperado aqui é de alinhamento.
-    try:
-        ram.load_word(1022)
-        assert False, "Deveria ter lançado erro de alinhamento!"
-    except ValueError:
-        pass
 
-    print(" [OK] Teste de limite de word passou!")
+# ==================== TESTES DA VRAM ====================
 
-    print("\nTodos os testes da RAM passaram com sucesso!")
-
-def testar_vram():
-
-    # VRAM possui 64 KiB = 0x10000 bytes
-    tamanho_teste = 0x10000
-
-    vram = VRAM(tamanho_teste)
-
-    print("Iniciando testes de memória (VRAM)...")
-
-    # 1. Teste de tamanho da VRAM
+def test_vram_tamanho_e_bytes(vram):
     assert len(vram.bytes) == 0x10000
 
-    print(" [OK] Teste de tamanho da VRAM passou!")
-
-    # 2. Teste de escrita e leitura de bytes individuais
-    vram.store_byte(0x00, 0x4F)  # 'O'
-    vram.store_byte(0x01, 0x49)  # 'I'
-
+    vram.store_byte(0x00, 0x4F)
+    vram.store_byte(0x01, 0x49)
     assert vram.load_byte(0x00) == 0x4F
     assert vram.load_byte(0x01) == 0x49
 
-    print(" [OK] Teste de bytes individuais passou!")
+    vram.store_byte(0x1000, 0xAB)
+    assert vram.load_byte(0x1000) == 0xAB
 
-    # 3. Teste de escrita e leitura em endereco intermediario
-    endereco = 0x1000
-    valor = 0xAB
+    vram.store_byte(0xFFFF, 0xFF)
+    assert vram.load_byte(0xFFFF) == 0xFF
 
-    vram.store_byte(endereco, valor)
 
-    assert vram.load_byte(endereco) == valor
-
-    print(" [OK] Teste de endereco intermediario passou!")
-
-    # 4. Teste do ultimo endereco valido
-    ultimo_endereco = 0xFFFF
-
-    vram.store_byte(ultimo_endereco, 0xFF)
-
-    assert vram.load_byte(ultimo_endereco) == 0xFF
-
-    print(" [OK] Teste do ultimo endereco valido passou!")
-
-    # 5. Teste de endereco fora da VRAM
-    try:
-        vram.load_byte(0x10000)
-
-        assert False, (
-            "Deveria ter lançado erro para "
-            "endereco fora da VRAM!"
-        )
-
-    except ValueError as erro:
-        assert "vram" in str(erro).lower()
-
-    print(" [OK] Teste de endereco fora da VRAM passou!")
-
-    # 6. Teste de endereco negativo
-    try:
-        vram.load_byte(-1)
-
-        assert False, (
-            "Deveria ter lançado erro "
-            "para endereco negativo!"
-        )
-
-    except ValueError:
-        pass
-
-    print(" [OK] Teste de endereco negativo passou!")
-
-    # 7. Teste de endereco que nao e inteiro
-    try:
-        vram.load_byte("10")
-
-        assert False, (
-            "Deveria ter lançado TypeError "
-            "para endereco nao inteiro!"
-        )
-
-    except TypeError:
-        pass
-
-    print(" [OK] Teste de tipo de endereco passou!")
-
-    # 8. Teste de valor maior que um byte
+def test_vram_mascara_byte(vram):
     vram.store_byte(0x10, 0x1234)
-
     assert vram.load_byte(0x10) == 0x34
 
-    print(" [OK] Teste de valor de byte passou!")
 
-    print("\nTodos os testes da VRAM passaram com sucesso!")
+def test_vram_excecoes(vram):
+    with pytest.raises(ValueError, match="(?i)vram"):
+        vram.load_byte(0x10000)
+
+    with pytest.raises(ValueError):
+        vram.load_byte(-1)
+
+    with pytest.raises(TypeError):
+        vram.load_byte("10")
 
 
+# ==================== TESTES DO BUS ====================
 
-if __name__ == "__main__":
-    testar_ram()
-    testar_vram()
+def test_bus_ram_byte_e_word(bus):
+    bus.store_byte(RAM_INICIO, 0x4F)
+    assert bus.load_byte(RAM_INICIO) == 0x4F
+
+    endereco = RAM_INICIO + 4
+    bus.store_word(endereco, 0x12345678)
+    assert bus.load_word(endereco) == 0x12345678
+    assert bus.load_byte(endereco) == 0x78
+    assert bus.load_byte(endereco + 1) == 0x56
+    assert bus.load_byte(endereco + 2) == 0x34
+    assert bus.load_byte(endereco + 3) == 0x12
+
+
+def test_bus_vram_byte_e_word(bus):
+    bus.store_byte(VRAM_INICIO, 0xAB)
+    assert bus.load_byte(VRAM_INICIO) == 0xAB
+
+    endereco_vram = VRAM_INICIO + 4
+    bus.store_word(endereco_vram, 0xAABBCCDD)
+    assert bus.load_word(endereco_vram) == 0xAABBCCDD
+
+
+def test_bus_limites_validos(bus):
+    bus.store_word(RAM_FIM - 3, 0xAABBCCDD)
+    assert bus.load_word(RAM_FIM - 3) == 0xAABBCCDD
+
+    bus.store_word(VRAM_FIM - 3, 0x11223344)
+    assert bus.load_word(VRAM_FIM - 3) == 0x11223344
+
+
+@pytest.mark.parametrize("endereco_invalido", [
+    -1,
+    IO_FIM + 1,
+    0xA0000,
+])
+def test_bus_enderecos_fora_do_mapa(bus, endereco_invalido):
+    with pytest.raises(ValueError):
+        bus.load_byte(endereco_invalido)
+
+
+def test_bus_regiao_reservada_e_io(bus):
+    with pytest.raises(ValueError, match="(?i)reservada"):
+        bus.load_byte(RESERVADO_INICIO)
+
+    with pytest.raises(ValueError, match="(?i)reservada"):
+        bus.store_byte(0x90000, 99)
+
+    # Testa a leitura do registrador DATA_IN
+    bus.io_device.queue_input(ord("A"))
+
+    assert bus.load_byte(IO_INICIO) == ord("A")
+
+    # Testa a escrita no registrador DATA_OUT
+    bus.store_byte(IO_INICIO + 4, ord("B"))
+
+    assert bus.io_device.read_output() == b"B"
+
+    # Após ler DATA_IN, STATUS deve indicar que não há entrada disponível
+    assert bus.load_byte(IO_INICIO + 8) == 0
+
+
+def test_bus_alinhamento_e_fronteira(bus):
+    with pytest.raises(ValueError, match="(?i)alinhado"):
+        bus.load_word(RAM_INICIO + 1)
+
+    with pytest.raises(ValueError, match="(?i)alinhado"):
+        bus.load_word(0x00002)
+
+    with pytest.raises(ValueError):
+        bus.load_word(RAM_FIM + 1 - 3)
+
+
+def test_bus_validacao_tipos_e_valores(bus):
+    with pytest.raises(TypeError):
+        bus.load_byte("100")
+
+    with pytest.raises(ValueError):
+        bus.store_byte(RAM_INICIO + 0x10, 256)
+
+    with pytest.raises(TypeError):
+        bus.store_byte(RAM_INICIO + 0x10, True)

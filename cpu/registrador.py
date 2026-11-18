@@ -2,13 +2,17 @@
 MASK32 = 0xFFFFFFFF
 
 def validar_registrador(func):
-    
+
     def wrapper(self, index, *args, **kwargs):
-        if not isinstance(index, int) or isinstance(index,bool):
+
+        if isinstance(index, bool) or not isinstance(index, int):
             raise TypeError("O índice deve ser um inteiro")
-        if not 0 <= index <31: 
+
+        if not 0 <= index < 32:
             raise ValueError("Registrador fora do intervalo")
-        return func(self, index,*args, **kwargs)
+
+        return func(self, index, *args, **kwargs)
+
     return wrapper
 
 

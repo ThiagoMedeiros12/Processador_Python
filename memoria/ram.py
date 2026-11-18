@@ -1,6 +1,5 @@
 from functools import wraps
 
-
 def validar_endereco(func):
     @wraps(func)
     def wrapper(self, endereco, *args, **kwargs):
@@ -12,7 +11,6 @@ def validar_endereco(func):
             raise ValueError(f"Endereco fora da {self.__class__.__name__}")
         return func(self, endereco, *args, **kwargs)    
     return wrapper
-
 
 def validar_word(func):
     @wraps(func)
@@ -62,16 +60,3 @@ class RAM:
         self.store_byte(endereco + 2, (valor >> 16) & 0xFF)
         self.store_byte(endereco + 3, (valor >> 24) & 0xFF)
 
-
-class VRAM:
-    def __init__(self,tamanho):
-        self.bytes = bytearray(tamanho)
-
-    @validar_endereco
-    def load_byte(self,endereco):
-        return self.bytes[endereco]
-    
-    @validar_endereco
-    def store_byte(self,endereco,valor):
-        self.bytes[endereco] = valor & 0xFF
-        
