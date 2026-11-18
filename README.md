@@ -74,6 +74,45 @@ O barramento (`Bus`) divide o espaço de endereçamento de 32 bits nas seguintes
 - Python 3.10 ou superior
 - [pytest](https://pytest.org/) para execução dos testes
 
+### Criando e ativando o ambiente virtual (PowerShell)
+
+No diretório raiz do projeto, crie um ambiente virtual:
+
+```powershell
+python -m venv .venv
+```
+
+Ative-o no PowerShell:
+
+```powershell
+.\.venv\Scripts\Activate.ps1
+```
+
+Se o PowerShell bloquear a execução do script de ativação, permita scripts **somente para a sessão atual** e tente novamente:
+
+```powershell
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
+.\.venv\Scripts\Activate.ps1
+```
+
+Com o ambiente ativado, instale as dependências:
+
+```powershell
+python -m pip install --upgrade pip
+python -m pip install -r requirements.txt
+```
+
+Para sair do ambiente virtual ao terminar:
+
+```powershell
+deactivate
+```
+
+> O uso de `-Scope Process` não altera permanentemente a política de execução do Windows: ele vale apenas para a janela atual do PowerShell.
+
+
+- [pytest](https://pytest.org/) para execução dos testes
+
 Instale as dependências:
 ```bash
 pip install -r requirements.txt
@@ -112,13 +151,13 @@ python main.py programs/clz_test.hex --dump-regs
 ```
 
 ### 3. Exibição Periódica da VRAM em ASCII (`--vram-intervalo N`)
-Transmite o estado da VRAM para o terminal automaticamente a cada $n$ instruções executadas (conforme exigido na Seção 4 do edital):
+Transmite o estado da VRAM para o terminal automaticamente a cada $n$ instruções executadas:
 ```bash
 python main.py programs/sistema_completo.hex --vram --vram-intervalo 50
 ```
 
 ### 4. Matriz da Memória RAM em 32 Colunas (`--dump-ram`)
-Exibe os setores da memória organizados em exatamente 32 colunas por linha (Seção 3 do edital):
+Exibe os setores da memória organizados em exatamente 32 colunas por linha:
 ```bash
 python main.py programs/sistema_completo.hex --dump-ram --ram-inicio 0x200 --ram-linhas 4
 ```
