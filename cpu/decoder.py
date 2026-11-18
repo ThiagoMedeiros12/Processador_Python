@@ -197,10 +197,16 @@ class Decoder:
                 "imm": imm,
             }
 
-        # Sistema (EBREAK, ECALL)
+        # Sistema (EBREAK, ECALL, MRET)
         if opcode == 0x73:
             imm = (instrucao >> 20) & 0xFFF
-            operacao = "EBREAK" if imm == 1 else "ECALL"
+            if imm == 1:
+                operacao = "EBREAK"
+            elif imm == 0x302:
+                operacao = "MRET"
+            else:
+                operacao = "ECALL"
+
             return {
                 "tipo": "SYS",
                 "operacao": operacao,

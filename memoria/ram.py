@@ -60,3 +60,48 @@ class RAM:
         self.store_byte(endereco + 2, (valor >> 16) & 0xFF)
         self.store_byte(endereco + 3, (valor >> 24) & 0xFF)
 
+    def dump_matriz_32_colunas(self, endereco_inicial=0, num_linhas=8, omitir_vazias=False):
+        """
+        Retorna a memória formatada como uma matriz de exatamente 32 colunas (32 bytes por linha),
+        conforme especificado na Seção 3 do projeto.
+        """
+        if endereco_inicial < 0 or endereco_inicial >= len(self.bytes):
+            raise ValueError("Endereço inicial fora dos limites da RAM")
+
+        colunas = 32
+        linhas_resultado = []
+
+        # Cabeçalho com as 32 colunas numeradas de 0x00 a 0x1F
+        cabecalho_hex = " ".join(f"{c:02X}" for c in range(colunas))
+        divisor = "=" * 115
+        linhas_resultado.append(divisor)
+        linhas_resultado.append(f"  MATRIZ DE MEMÓRIA RAM (32 COLUNAS) - Início: 0x{endereco_inicial:05X}")
+        linhas_resultado.append(divisor)
+        linhas_resultado.append(f"Endereço | {cabecalho_hex} | ASCII (32 colunas)")
+        linhas_resultado.append("-" * 115)
+
+        total_bytes = len(self.bytes)
+        for i in range(num_linhas):
+            offset = endereco_inicial + (i * colunas)
+            if offset >= total_bytes:
+                break
+
+            fim = min(offset + colunas, total_bytes)
+            fatia = self.bytes[offset:fim]
+
+            if omitir_vazias and all(b == 0 for b in fatia):
+                continue
+
+            hex_bytes = " ".join(f"{b:02X}" for b in fatia)
+            # Preenche se a última linha tiver menos de 32 bytes
+            if len(fatia) < colunas:
+                hex_bytes = hex_bytes.ljust(colunas * 3 - 1)
+
+            ascii_repr = "".join(chr(b) if 32 <= b <= 126 else "." for b in fatia)
+
+            linhas_resultado.append(f"0x{offset:05X}  | {hex_bytes} | {ascii_repr}")
+
+        linhas_resultado.append(divisor)
+        return "\n".join(linhas_resultado)
+
+

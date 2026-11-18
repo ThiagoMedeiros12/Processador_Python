@@ -184,3 +184,45 @@ def test_bus_validacao_tipos_e_valores(bus):
 
     with pytest.raises(TypeError):
         bus.store_byte(RAM_INICIO + 0x10, True)
+
+
+def test_ram_dump_matriz_32_colunas(ram):
+    # Grava alguns bytes conhecidos
+    ram.store_byte(0, ord("R"))
+    ram.store_byte(1, ord("I"))
+    ram.store_byte(2, ord("S"))
+    ram.store_byte(3, ord("C"))
+
+    dump = ram.dump_matriz_32_colunas(endereco_inicial=0, num_linhas=2)
+    assert "MATRIZ DE MEMÓRIA RAM (32 COLUNAS)" in dump
+    assert "0x00000" in dump
+    assert "RISC" in dump
+
+    with pytest.raises(ValueError):
+        ram.dump_matriz_32_colunas(endereco_inicial=-1)
+
+
+def test_bus_tres_partes_e_interrupcoes(bus):
+    # 1. Barramento de endereços e dados após escrita
+    bus.store_word(RAM_INICIO + 0x10, 0x12345678)
+    assert bus.barramento_enderecos == RAM_INICIO + 0x10
+    assert bus.barramento_dados == 0x12345678
+    assert bus.barramento_controle["write"] is True
+    assert bus.barramento_controle["read"] is False
+    assert bus.barramento_controle["tamanho"] == 4
+
+    # 2. Barramento de endereços e dados após leitura
+    lido = bus.load_word(RAM_INICIO + 0x10)
+    assert lido == 0x12345678
+    assert bus.barramento_dados == 0x12345678
+    assert bus.barramento_controle["read"] is True
+    assert bus.barramento_controle["write"] is False
+
+    # 3. Gerenciamento de interrupções
+    assert bus.verificar_interrupcao() is False
+    bus.solicitar_interrupcao(codigo=42)
+    assert bus.verificar_interrupcao() is True
+
+    codigo_atendido = bus.atender_interrupcao()
+    assert codigo_atendido == 42
+    assert bus.verificar_interrupcao() is False

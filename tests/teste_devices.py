@@ -75,3 +75,18 @@ def test_terminal_entrada_invalida(ambiente_terminal):
 
     with pytest.raises(TypeError):
         terminal.enviar_entrada(123)
+
+
+def test_io_device_dispara_interrupcao_ao_receber_tecla():
+    from memoria.bus import Bus
+    bus = Bus()
+    terminal = Terminal(bus.io_device)
+
+    assert bus.verificar_interrupcao() is False
+    terminal.enviar_entrada("K")
+    assert bus.verificar_interrupcao() is True
+
+    # Atende a interrupção e verifica que o dado está no registrador DATA_IN
+    bus.atender_interrupcao()
+    assert bus.load_byte(0x9FC00) == ord("K")
+

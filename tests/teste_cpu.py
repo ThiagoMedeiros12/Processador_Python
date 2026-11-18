@@ -164,3 +164,103 @@ def test_cpu_envia_caractere_para_terminal(ambiente_cpu):
     cpu.executar()
 
     assert terminal.obter_saida() == "A"
+
+
+def test_cpu_executa_arquivo_clz_test(ambiente_cpu):
+    from programs.loader import carregar_programa
+
+    cpu, bus, _, _ = ambiente_cpu
+    carregar_programa("programs/clz_test.hex", bus)
+    ciclos = cpu.executar()
+
+    assert ciclos > 0
+    assert cpu.ler_registrador(2) == 32
+    assert cpu.ler_registrador(4) == 29
+    assert cpu.ler_registrador(6) == 0
+    assert cpu.ler_registrador(8) == 31
+    assert bus.load_word(0x100) == 32
+    assert bus.load_word(0x104) == 29
+    assert bus.load_word(0x108) == 0
+    assert bus.load_word(0x10C) == 31
+
+
+def test_cpu_executa_arquivo_system_test(ambiente_cpu):
+    from programs.loader import carregar_programa
+    from devices.terminal import Terminal
+
+    cpu, bus, _, vram = ambiente_cpu
+    terminal = Terminal(bus.io_device)
+
+    carregar_programa("programs/system_test.hex", bus)
+    ciclos = cpu.executar()
+
+    assert ciclos > 0
+    assert terminal.obter_saida() == "RISC-V OK!\n"
+    assert vram.load_byte(0) == ord("+")
+    assert vram.load_byte(1) == ord("-")
+
+
+def test_cpu_ciclo_interrupcao_e_mret(ambiente_cpu):
+    cpu, bus, _, _ = ambiente_cpu
+
+    # Programa principal:
+    # 0x00: addi x1, x0, 10
+    # 0x04: addi x2, x0, 20
+    # 0x08: ebreak
+    bus.store_word(0x00, 0x00A00093)
+    bus.store_word(0x04, 0x01400113)
+    bus.store_word(0x08, 0x00100073)
+
+    # Tratador de Interrupção (ISR) em 0x00040:
+    # 0x40: addi x3, x0, 99 (marca execução da ISR)
+    # 0x44: mret (retorna da interrupção para o PC salvo)
+    bus.store_word(0x40, 0x06300193)
+    bus.store_word(0x44, 0x30200073)  # mret
+
+    # Executa primeiro ciclo (addi x1, x0, 10)
+    cpu.executar_ciclo()
+    assert cpu.ler_registrador(1) == 10
+
+    # Dispara interrupção externa no barramento
+    bus.solicitar_interrupcao(codigo=1)
+
+    # Executa segundo ciclo: CPU executa 0x04 (addi x2, x0, 20) e atende a interrupção saltando para 0x40
+    cpu.executar_ciclo()
+    assert cpu.ler_registrador(2) == 20
+    assert cpu.pc == 0x40
+    assert cpu.mepc == 0x08
+    assert cpu.interrupcoes_processadas == 1
+
+    # Executa o tratador de interrupção
+    cpu.executar_ciclo()  # addi x3, x0, 99
+    assert cpu.ler_registrador(3) == 99
+
+    cpu.executar_ciclo()  # mret -> retorna para 0x08
+    assert cpu.pc == 0x08
+    assert cpu.interrupcoes_habilitadas is True
+
+    # Continua o programa principal (ebreak)
+    cpu.executar_ciclo()
+    assert cpu.rodando is False
+
+
+def test_cpu_executa_arquivo_sistema_completo(ambiente_cpu):
+    from programs.loader import carregar_programa
+    from devices.terminal import Terminal
+
+    cpu, bus, _, vram = ambiente_cpu
+    terminal = Terminal(bus.io_device)
+
+    carregar_programa("programs/sistema_completo.hex", bus)
+    ciclos = cpu.executar()
+
+    assert ciclos > 0
+    assert terminal.obter_saida() == "[RV32I] SISTEMA COMPLETO OK\n"
+    assert bus.load_word(0x240) == 31
+    assert bus.load_word(0x244) == 30
+    assert bus.load_word(0x248) == 29
+    assert bus.load_word(0x24C) == 28
+    assert vram.load_byte(0) == ord("+")
+    assert vram.load_byte(1) == ord("-")
+
+

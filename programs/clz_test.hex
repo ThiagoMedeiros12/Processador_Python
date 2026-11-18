@@ -1,0 +1,29 @@
+# ==========================================================
+# Programa de Teste de Instrução CLZ (Count Leading Zeros)
+# Arquitetura: RISC-V RV32I + Zbb (CLZ)
+# ==========================================================
+
+# 1. Teste de zero: x1 = 0 -> clz(0) = 32
+00000093    # addi x1, x0, 0
+60009113    # clz  x2, x1           (esperado: 32 / 0x20)
+
+# 2. Teste de valor 5 (0b101): x3 = 5 -> clz(5) = 29
+00500193    # addi x3, x0, 5
+60019213    # clz  x4, x3           (esperado: 29 / 0x1D)
+
+# 3. Teste de MSB setado: x5 = 0x80000000 -> clz = 0
+800002B7    # lui  x5, 0x80000
+60029313    # clz  x6, x5           (esperado: 0)
+
+# 4. Teste de valor 1: x7 = 1 -> clz(1) = 31
+00100393    # addi x7, x0, 1
+60039413    # clz  x8, x7           (esperado: 31 / 0x1F)
+
+# 5. Salva os resultados calculados na memória RAM (endereços 0x100..0x10C)
+10202023    # sw   x2, 256(x0)      (RAM[0x100] = 32)
+10402223    # sw   x4, 260(x0)      (RAM[0x104] = 29)
+10602423    # sw   x6, 264(x0)      (RAM[0x108] = 0)
+10802623    # sw   x8, 268(x0)      (RAM[0x10C] = 31)
+
+# Fim da execução
+00100073    # ebreak

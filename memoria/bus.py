@@ -61,6 +61,39 @@ class Bus:
         self.io_device = (
             io_device if io_device is not None else IODevice()
         )
+        if hasattr(self.io_device, "vincular_barramento"):
+            self.io_device.vincular_barramento(self)
+
+        # 1.) Barramento de dados: 32 bits
+        self.barramento_dados = 0
+
+        # 2.) Barramento de endereços: 32 bits
+        self.barramento_enderecos = 0
+
+        # 3.) Barramento de controle: leitura/escrita e gerenciamento de interrupções
+        self.barramento_controle = {
+            "read": False,
+            "write": False,
+            "tamanho": 1,
+            "int_req": False,
+            "int_ack": False,
+            "int_codigo": 0,
+        }
+
+    def solicitar_interrupcao(self, codigo=1):
+        """Sinaliza uma requisição de interrupção (INT_REQ) no barramento de controle."""
+        self.barramento_controle["int_req"] = True
+        self.barramento_controle["int_codigo"] = codigo
+
+    def verificar_interrupcao(self):
+        """Verifica se há interrupção pendente na linha de controle do barramento."""
+        return self.barramento_controle["int_req"]
+
+    def atender_interrupcao(self):
+        """Confirma o atendimento da interrupção (INT_ACK) e limpa a linha de requisição."""
+        self.barramento_controle["int_ack"] = True
+        self.barramento_controle["int_req"] = False
+        return self.barramento_controle["int_codigo"]
 
     def _identificar_regiao(self, endereco):
 
@@ -120,14 +153,18 @@ class Bus:
 
     @validar_acesso(1)
     def load_byte(self, endereco):
+        self.barramento_enderecos = endereco & 0xFFFFFFFF
+        self.barramento_controle["read"] = True
+        self.barramento_controle["write"] = False
+        self.barramento_controle["tamanho"] = 1
 
         regiao = self._identificar_regiao(endereco)
-
         dispositivo = self._dispositivo(regiao)
-
         local = self._endereco_local(endereco, regiao)
 
-        return dispositivo.load_byte(local)
+        valor = dispositivo.load_byte(local)
+        self.barramento_dados = valor
+        return valor
 
     @validar_acesso(1)
     def store_byte(self, endereco, valor):
@@ -138,10 +175,14 @@ class Bus:
         if not 0 <= valor <= 0xFF:
             raise ValueError("Valor precisa estar entre 0 e 255")
 
+        self.barramento_enderecos = endereco & 0xFFFFFFFF
+        self.barramento_dados = valor
+        self.barramento_controle["read"] = False
+        self.barramento_controle["write"] = True
+        self.barramento_controle["tamanho"] = 1
+
         regiao = self._identificar_regiao(endereco)
-
         dispositivo = self._dispositivo(regiao)
-
         local = self._endereco_local(endereco, regiao)
 
         dispositivo.store_byte(local, valor)
@@ -151,20 +192,26 @@ class Bus:
 
         if self._identificar_regiao(endereco) == "IO":
             raise ValueError(
-        "Acesso word nao suportado em I/O. Utilize load_byte."
-        )
-        
-        b0 = self.load_byte(endereco)
-        b1 = self.load_byte(endereco + 1)
-        b2 = self.load_byte(endereco + 2)
-        b3 = self.load_byte(endereco + 3)
+                "Acesso word nao suportado em I/O. Utilize load_byte."
+            )
 
-        return (
-            b0 |
-            (b1 << 8) |
-            (b2 << 16) |
-            (b3 << 24)
-        )
+        self.barramento_enderecos = endereco & 0xFFFFFFFF
+        self.barramento_controle["read"] = True
+        self.barramento_controle["write"] = False
+        self.barramento_controle["tamanho"] = 4
+
+        regiao = self._identificar_regiao(endereco)
+        if regiao == "RAM":
+            valor = self.ram.load_word(self._endereco_local(endereco, regiao))
+        else:
+            b0 = self.load_byte(endereco)
+            b1 = self.load_byte(endereco + 1)
+            b2 = self.load_byte(endereco + 2)
+            b3 = self.load_byte(endereco + 3)
+            valor = b0 | (b1 << 8) | (b2 << 16) | (b3 << 24)
+
+        self.barramento_dados = valor
+        return valor
 
     @validar_acesso(4)
     def store_word(self, endereco, valor):
@@ -174,12 +221,21 @@ class Bus:
 
         if self._identificar_regiao(endereco) == "IO":
             raise ValueError(
-        "Acesso word nao suportado em I/O. Utilize store_byte."
-        )
-            
-        valor &= 0xFFFFFFFF
+                "Acesso word nao suportado em I/O. Utilize store_byte."
+            )
 
-        self.store_byte(endereco, valor & 0xFF)
-        self.store_byte(endereco + 1, (valor >> 8) & 0xFF)
-        self.store_byte(endereco + 2, (valor >> 16) & 0xFF)
-        self.store_byte(endereco + 3, (valor >> 24) & 0xFF)
+        valor &= 0xFFFFFFFF
+        self.barramento_enderecos = endereco & 0xFFFFFFFF
+        self.barramento_dados = valor
+        self.barramento_controle["read"] = False
+        self.barramento_controle["write"] = True
+        self.barramento_controle["tamanho"] = 4
+
+        regiao = self._identificar_regiao(endereco)
+        if regiao == "RAM":
+            self.ram.store_word(self._endereco_local(endereco, regiao), valor)
+        else:
+            self.store_byte(endereco, valor & 0xFF)
+            self.store_byte(endereco + 1, (valor >> 8) & 0xFF)
+            self.store_byte(endereco + 2, (valor >> 16) & 0xFF)
+            self.store_byte(endereco + 3, (valor >> 24) & 0xFF)

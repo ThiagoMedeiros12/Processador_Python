@@ -1,0 +1,149 @@
+# ==============================================================================
+# Programa de Demonstração Completa do Sistema (UniSantos - Organização de Comp)
+# Cobre 100% dos Requisitos: LW, SW, CLZ, Loops, Branches, Terminal MMIO e VRAM
+# ==============================================================================
+
+# ------------------------------------------------------------------------------
+# PARTE 1: Processamento em RAM com laço, LW, SW e instrução especial CLZ
+# ------------------------------------------------------------------------------
+20000513    # addi x10, x0, 512       (x10 = base de dados 0x200 na RAM)
+00100593    # addi x11, x0, 1         (prepara valor de entrada)
+00B52023    # sw   x11, 0(x10)       (armazena na RAM[0x200])
+00200593    # addi x11, x0, 2         (prepara valor de entrada)
+00B52223    # sw   x11, 4(x10)       (armazena na RAM[0x204])
+00400593    # addi x11, x0, 4         (prepara valor de entrada)
+00B52423    # sw   x11, 8(x10)       (armazena na RAM[0x208])
+00800593    # addi x11, x0, 8         (prepara valor de entrada)
+00B52623    # sw   x11, 12(x10)       (armazena na RAM[0x20C])
+
+# Inicialização das variáveis do laço (for i=0; i<16; i+=4)
+00000613    # addi x12, x0, 0         (x12 = offset_i = 0)
+01000893    # addi x17, x0, 16        (x17 = limite = 16 bytes)
+
+# LOOP_PROCESSAMENTO:
+00C50733    # add  x14, x10, x12      (x14 = endereço atual de leitura)
+00072783    # lw   x15, 0(x14)        (lê dado da RAM com LW)
+60079813    # clz  x16, x15           (calcula zeros à esquerda com CLZ)
+05072023    # sw   x16, 64(x14)       (salva resultado com SW em 0x240+offset)
+00460613    # addi x12, x12, 4        (i += 4)
+FF1616E3    # bne  x12, x17, -20      (salta se i != 16 para continuar laço)
+
+# ------------------------------------------------------------------------------
+# PARTE 2: Transmissão de Mensagem para o Terminal via Hardware MMIO (0x9FC04)
+# ------------------------------------------------------------------------------
+000A00B7    # lui  x1, 0xA0
+C0008093    # addi x1, x1, -1024      (x1 = 0x9FC00 - base de E/S)
+05B00113    # addi x2, x0, 91        (char '[')
+00208223    # sb   x2, 4(x1)         (envia para registrador DATA_OUT)
+05200113    # addi x2, x0, 82        (char 'R')
+00208223    # sb   x2, 4(x1)         (envia para registrador DATA_OUT)
+05600113    # addi x2, x0, 86        (char 'V')
+00208223    # sb   x2, 4(x1)         (envia para registrador DATA_OUT)
+03300113    # addi x2, x0, 51        (char '3')
+00208223    # sb   x2, 4(x1)         (envia para registrador DATA_OUT)
+03200113    # addi x2, x0, 50        (char '2')
+00208223    # sb   x2, 4(x1)         (envia para registrador DATA_OUT)
+04900113    # addi x2, x0, 73        (char 'I')
+00208223    # sb   x2, 4(x1)         (envia para registrador DATA_OUT)
+05D00113    # addi x2, x0, 93        (char ']')
+00208223    # sb   x2, 4(x1)         (envia para registrador DATA_OUT)
+02000113    # addi x2, x0, 32        (char ' ')
+00208223    # sb   x2, 4(x1)         (envia para registrador DATA_OUT)
+05300113    # addi x2, x0, 83        (char 'S')
+00208223    # sb   x2, 4(x1)         (envia para registrador DATA_OUT)
+04900113    # addi x2, x0, 73        (char 'I')
+00208223    # sb   x2, 4(x1)         (envia para registrador DATA_OUT)
+05300113    # addi x2, x0, 83        (char 'S')
+00208223    # sb   x2, 4(x1)         (envia para registrador DATA_OUT)
+05400113    # addi x2, x0, 84        (char 'T')
+00208223    # sb   x2, 4(x1)         (envia para registrador DATA_OUT)
+04500113    # addi x2, x0, 69        (char 'E')
+00208223    # sb   x2, 4(x1)         (envia para registrador DATA_OUT)
+04D00113    # addi x2, x0, 77        (char 'M')
+00208223    # sb   x2, 4(x1)         (envia para registrador DATA_OUT)
+04100113    # addi x2, x0, 65        (char 'A')
+00208223    # sb   x2, 4(x1)         (envia para registrador DATA_OUT)
+02000113    # addi x2, x0, 32        (char ' ')
+00208223    # sb   x2, 4(x1)         (envia para registrador DATA_OUT)
+04300113    # addi x2, x0, 67        (char 'C')
+00208223    # sb   x2, 4(x1)         (envia para registrador DATA_OUT)
+04F00113    # addi x2, x0, 79        (char 'O')
+00208223    # sb   x2, 4(x1)         (envia para registrador DATA_OUT)
+04D00113    # addi x2, x0, 77        (char 'M')
+00208223    # sb   x2, 4(x1)         (envia para registrador DATA_OUT)
+05000113    # addi x2, x0, 80        (char 'P')
+00208223    # sb   x2, 4(x1)         (envia para registrador DATA_OUT)
+04C00113    # addi x2, x0, 76        (char 'L')
+00208223    # sb   x2, 4(x1)         (envia para registrador DATA_OUT)
+04500113    # addi x2, x0, 69        (char 'E')
+00208223    # sb   x2, 4(x1)         (envia para registrador DATA_OUT)
+05400113    # addi x2, x0, 84        (char 'T')
+00208223    # sb   x2, 4(x1)         (envia para registrador DATA_OUT)
+04F00113    # addi x2, x0, 79        (char 'O')
+00208223    # sb   x2, 4(x1)         (envia para registrador DATA_OUT)
+02000113    # addi x2, x0, 32        (char ' ')
+00208223    # sb   x2, 4(x1)         (envia para registrador DATA_OUT)
+04F00113    # addi x2, x0, 79        (char 'O')
+00208223    # sb   x2, 4(x1)         (envia para registrador DATA_OUT)
+04B00113    # addi x2, x0, 75        (char 'K')
+00208223    # sb   x2, 4(x1)         (envia para registrador DATA_OUT)
+00A00113    # addi x2, x0, 10        (char '\n')
+00208223    # sb   x2, 4(x1)         (envia para registrador DATA_OUT)
+
+# ------------------------------------------------------------------------------
+# PARTE 3: Carga da VRAM (0x80000) usando STORE WORD (SW) - Seção 4 do Edital
+# ------------------------------------------------------------------------------
+000801B7    # lui  x3, 0x80           (x3 = 0x80000 - base da VRAM)
+2D2D3237    # lui  x4, 0x2D2D3
+D2B20213    # addi x4, x4, -725     (palavra ASCII '+---')
+0041A023    # sw   x4, 0(x3)        (grava 4 bytes via SW na VRAM)
+2D2D3237    # lui  x4, 0x2D2D3
+D2D20213    # addi x4, x4, -723     (palavra ASCII '----')
+0041A223    # sw   x4, 4(x3)        (grava 4 bytes via SW na VRAM)
+2D2D3237    # lui  x4, 0x2D2D3
+D2D20213    # addi x4, x4, -723     (palavra ASCII '----')
+0041A423    # sw   x4, 8(x3)        (grava 4 bytes via SW na VRAM)
+2B2D3237    # lui  x4, 0x2B2D3
+D2D20213    # addi x4, x4, -723     (palavra ASCII '---+')
+0041A623    # sw   x4, 12(x3)        (grava 4 bytes via SW na VRAM)
+4E552237    # lui  x4, 0x4E552
+07C20213    # addi x4, x4, 124      (palavra ASCII '| UN')
+0041A823    # sw   x4, 16(x3)        (grava 4 bytes via SW na VRAM)
+4E415237    # lui  x4, 0x4E415
+34920213    # addi x4, x4, 841      (palavra ASCII 'ISAN')
+0041AA23    # sw   x4, 20(x3)        (grava 4 bytes via SW na VRAM)
+20535237    # lui  x4, 0x20535
+F5420213    # addi x4, x4, -172     (palavra ASCII 'TOS ')
+0041AC23    # sw   x4, 24(x3)        (grava 4 bytes via SW na VRAM)
+7C204237    # lui  x4, 0x7C204
+34F20213    # addi x4, x4, 847      (palavra ASCII 'OC |')
+0041AE23    # sw   x4, 28(x3)        (grava 4 bytes via SW na VRAM)
+56522237    # lui  x4, 0x56522
+07C20213    # addi x4, x4, 124      (palavra ASCII '| RV')
+0241A023    # sw   x4, 32(x3)        (grava 4 bytes via SW na VRAM)
+20493237    # lui  x4, 0x20493
+23320213    # addi x4, x4, 563      (palavra ASCII '32I ')
+0241A223    # sw   x4, 36(x3)        (grava 4 bytes via SW na VRAM)
+4C432237    # lui  x4, 0x4C432
+02B20213    # addi x4, x4, 43       (palavra ASCII '+ CL')
+0241A423    # sw   x4, 40(x3)        (grava 4 bytes via SW na VRAM)
+7C202237    # lui  x4, 0x7C202
+05A20213    # addi x4, x4, 90       (palavra ASCII 'Z  |')
+0241A623    # sw   x4, 44(x3)        (grava 4 bytes via SW na VRAM)
+2D2D3237    # lui  x4, 0x2D2D3
+D2B20213    # addi x4, x4, -725     (palavra ASCII '+---')
+0241A823    # sw   x4, 48(x3)        (grava 4 bytes via SW na VRAM)
+2D2D3237    # lui  x4, 0x2D2D3
+D2D20213    # addi x4, x4, -723     (palavra ASCII '----')
+0241AA23    # sw   x4, 52(x3)        (grava 4 bytes via SW na VRAM)
+2D2D3237    # lui  x4, 0x2D2D3
+D2D20213    # addi x4, x4, -723     (palavra ASCII '----')
+0241AC23    # sw   x4, 56(x3)        (grava 4 bytes via SW na VRAM)
+2B2D3237    # lui  x4, 0x2B2D3
+D2D20213    # addi x4, x4, -723     (palavra ASCII '---+')
+0241AE23    # sw   x4, 60(x3)        (grava 4 bytes via SW na VRAM)
+
+# ------------------------------------------------------------------------------
+# PARTE 4: Encerramento
+# ------------------------------------------------------------------------------
+00100073    # ebreak

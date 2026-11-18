@@ -1,7 +1,7 @@
 
 from memoria.bus import Bus
 from cpu.decoder import Decoder, estender_sinal
-from cpu.alu import clz32
+from cpu.alu import ALU, clz32
 from cpu.registrador import RegisterFile
 
 MASK32 = 0xFFFFFFFF
@@ -9,7 +9,7 @@ MASK32 = 0xFFFFFFFF
 
 class CPU:
 
-    def __init__(self, bus=None, pc_inicial=0x00000):
+    def __init__(self, bus=None, pc_inicial=0x00000, endereco_isr=0x00040):
         self.bus = bus if bus is not None else Bus()
         self.decoder = Decoder()
 
@@ -21,6 +21,26 @@ class CPU:
 
         self.pc = pc_inicial & MASK32
         self.rodando = True
+
+        # Controle de interrupções (Figura 7 do edital)
+        self.interrupcoes_habilitadas = True
+        self.endereco_isr = endereco_isr & MASK32
+        self.mepc = 0  # Registrador de retorno de exceção/interrupção
+        self.interrupcoes_processadas = 0
+
+    def processar_interrupcao(self):
+        """Atende a requisição de interrupção (Figura 7 do edital)."""
+        self.mepc = self.pc
+        self.interrupcoes_habilitadas = False
+        if hasattr(self.bus, "atender_interrupcao"):
+            self.bus.atender_interrupcao()
+        self.interrupcoes_processadas += 1
+        self.pc = self.endereco_isr
+
+    def retornar_interrupcao(self):
+        """Retorna da interrupção (instrução MRET)."""
+        self.pc = self.mepc & MASK32
+        self.interrupcoes_habilitadas = True
 
     def ler_registrador(self, indice):
         return self.register_file.read(indice)
@@ -58,71 +78,15 @@ class CPU:
         # TIPO R
         # =========================
 
-        if op == "ADD":
-            self.escrever_registrador(rd, v1 + v2)
-
-        elif op == "SUB":
-            self.escrever_registrador(rd, v1 - v2)
-
-        elif op == "SLL":
-            self.escrever_registrador(rd, v1 << (v2 & 0x1F))
-
-        elif op == "SLT":
-            self.escrever_registrador(rd, int(s1 < s2))
-
-        elif op == "SLTU":
-            self.escrever_registrador(rd, int(v1 < v2))
-
-        elif op == "XOR":
-            self.escrever_registrador(rd, v1 ^ v2)
-
-        elif op == "SRL":
-            self.escrever_registrador(rd, v1 >> (v2 & 0x1F))
-
-        elif op == "SRA":
-            self.escrever_registrador(rd, s1 >> (v2 & 0x1F))
-
-        elif op == "OR":
-            self.escrever_registrador(rd, v1 | v2)
-
-        elif op == "AND":
-            self.escrever_registrador(rd, v1 & v2)
+        if op in ("ADD", "SUB", "SLL", "SLT", "SLTU", "XOR", "SRL", "SRA", "OR", "AND"):
+            self.escrever_registrador(rd, ALU.executar(op, v1, v2))
 
         # =========================
         # TIPO I - ALU
         # =========================
 
-        elif op == "CLZ":
-            self.escrever_registrador(rd, clz32(v1))
-
-        elif op == "ADDI":
-            self.escrever_registrador(rd, v1 + imm)
-
-        elif op == "SLTI":
-            self.escrever_registrador(rd, int(s1 < imm))
-
-        elif op == "SLTIU":
-            self.escrever_registrador(
-                rd, int(v1 < (imm & MASK32))
-            )
-
-        elif op == "XORI":
-            self.escrever_registrador(rd, v1 ^ imm)
-
-        elif op == "ORI":
-            self.escrever_registrador(rd, v1 | imm)
-
-        elif op == "ANDI":
-            self.escrever_registrador(rd, v1 & imm)
-
-        elif op == "SLLI":
-            self.escrever_registrador(rd, v1 << imm)
-
-        elif op == "SRLI":
-            self.escrever_registrador(rd, v1 >> imm)
-
-        elif op == "SRAI":
-            self.escrever_registrador(rd, s1 >> imm)
+        elif op in ("CLZ", "ADDI", "SLTI", "SLTIU", "XORI", "ORI", "ANDI", "SLLI", "SRLI", "SRAI"):
+            self.escrever_registrador(rd, ALU.executar(op, v1, imm))
 
         # =========================
         # LOAD
@@ -216,6 +180,10 @@ class CPU:
         elif op in ("EBREAK", "ECALL"):
             self.rodando = False
 
+        elif op == "MRET":
+            self.retornar_interrupcao()
+            proximo_pc = self.pc
+
         else:
             raise NotImplementedError(
                 f"Instrucao nao implementada: {op}"
@@ -223,13 +191,20 @@ class CPU:
 
         self.pc = proximo_pc
 
-    def executar(self, limite_ciclos=10000):
+        # Ciclo de interrupções (Figura 7 do edital)
+        if self.rodando and self.interrupcoes_habilitadas:
+            if hasattr(self.bus, "verificar_interrupcao") and self.bus.verificar_interrupcao():
+                self.processar_interrupcao()
+
+    def executar(self, limite_ciclos=10000, callback_ciclo=None):
 
         ciclos = 0
 
         while self.rodando and ciclos < limite_ciclos:
             self.executar_ciclo()
             ciclos += 1
+            if callback_ciclo:
+                callback_ciclo(self, ciclos)
 
         if self.rodando:
             raise RuntimeError(
